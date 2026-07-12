@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duel Arena - Em Jogo</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="game-container">
+  <div class="hud">
+    <div id="status">Conectando...</div>
+    <button id="btn-ready" class="btn btn-primary hidden">Estou Pronto</button>
+    <button id="btn-again" class="btn btn-secondary hidden">Jogar Novamente</button>
+    <button id="btn-leave" class="btn btn-ghost">Sair</button>
+  </div>
+
+  <canvas id="canvas" width="800" height="600"></canvas>
+
+  <div id="game-over" class="game-over hidden">
+    <h2 id="result-text"></h2>
+    <button id="btn-rematch" class="btn btn-primary">Jogar Novamente</button>
+    <button id="btn-back-menu" class="btn btn-ghost">Voltar ao menu</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/game.js"></script>
+</body>
+</html>

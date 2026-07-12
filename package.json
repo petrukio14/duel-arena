@@ -1,0 +1,16 @@
+﻿{
+  "name": "duel-arena",
+  "version": "1.0.0",
+  "description": "Jogo de duelo 1v1 online em arena 2D top-down",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["game", "multiplayer", "socket.io", "arena", "duel"],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}

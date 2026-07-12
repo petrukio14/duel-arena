@@ -1,0 +1,46 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duel Arena</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+  <h1>Duel Arena</h1>
+  <p class="subtitle">Jogo de duelo 1v1 - cada um por si</p>
+
+  <div class="panel" id="menu">
+    <button id="btn-create" class="btn btn-primary">Criar Sala</button>
+
+    <div class="separator">ou</div>
+
+    <div class="join-row">
+      <input id="room-code" type="text" maxlength="4" placeholder="Codigo" autocomplete="off">
+      <button id="btn-join" class="btn btn-secondary">Entrar</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="created">
+    <h2>Sala criada!</h2>
+    <p>Compartilhe o codigo com seu oponente:</p>
+    <div class="room-code" id="show-code"></div>
+    <p class="waiting">Aguardando oponente...</p>
+    <p class="hint">Mande seu amigo abrir o link e digitar o codigo acima.</p>
+    <button id="btn-back-create" class="btn btn-ghost">Voltar</button>
+  </div>
+
+  <div class="panel hidden" id="joining">
+    <h2>Entrando na sala <span id="joining-code"></span>...</h2>
+    <p>Aguardando a partida comecar.</p>
+    <button id="btn-back-join" class="btn btn-ghost">Voltar</button>
+  </div>
+
+  <div class="error hidden" id="error-msg"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/menu.js"></script>
+</body>
+</html>
