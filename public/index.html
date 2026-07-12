@@ -7,40 +7,52 @@
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<div class="container">
-  <h1>Duel Arena</h1>
-  <p class="subtitle">Jogo de duelo 1v1 - cada um por si</p>
 
-  <div class="panel" id="menu">
-    <button id="btn-create" class="btn btn-primary">Criar Sala</button>
+<div id="app">
+  <div class="container" id="screen-menu">
+    <h1>Duel Arena</h1>
+    <p class="subtitle">Jogo de duelo 1v1 - cada um por si</p>
 
-    <div class="separator">ou</div>
+    <div class="panel" id="menu">
+      <button id="btn-create" class="btn btn-primary">Criar Sala</button>
+      <div class="separator">ou</div>
+      <div class="join-row">
+        <input id="room-code" type="text" maxlength="4" placeholder="Codigo" autocomplete="off">
+        <button id="btn-join" class="btn btn-secondary">Entrar</button>
+      </div>
+    </div>
 
-    <div class="join-row">
-      <input id="room-code" type="text" maxlength="4" placeholder="Codigo" autocomplete="off">
-      <button id="btn-join" class="btn btn-secondary">Entrar</button>
+    <div class="panel hidden" id="panel-waiting">
+      <h2 id="waiting-title">Sala criada!</h2>
+      <p id="waiting-desc">Compartilhe o codigo com seu oponente:</p>
+      <div class="room-code" id="show-code"></div>
+      <p class="waiting" id="waiting-status">Aguardando oponente...</p>
+      <p class="hint">Mande seu amigo abrir o link e digitar o codigo.</p>
+      <button id="btn-back-waiting" class="btn btn-ghost">Voltar</button>
+    </div>
+
+    <div class="error hidden" id="error-msg"></div>
+  </div>
+
+  <div class="game-container hidden" id="screen-game">
+    <div class="hud">
+      <div id="status">Conectando...</div>
+      <button id="btn-ready" class="btn btn-primary hidden">Estou Pronto</button>
+      <button id="btn-leave" class="btn btn-ghost">Sair</button>
+    </div>
+
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <div id="game-over" class="game-over hidden">
+      <h2 id="result-text"></h2>
+      <button id="btn-rematch" class="btn btn-primary">Jogar Novamente</button>
+      <button id="btn-back-menu" class="btn btn-ghost">Voltar ao menu</button>
     </div>
   </div>
-
-  <div class="panel hidden" id="created">
-    <h2>Sala criada!</h2>
-    <p>Compartilhe o codigo com seu oponente:</p>
-    <div class="room-code" id="show-code"></div>
-    <p class="waiting">Aguardando oponente...</p>
-    <p class="hint">Mande seu amigo abrir o link e digitar o codigo acima.</p>
-    <button id="btn-back-create" class="btn btn-ghost">Voltar</button>
-  </div>
-
-  <div class="panel hidden" id="joining">
-    <h2>Entrando na sala <span id="joining-code"></span>...</h2>
-    <p>Aguardando a partida comecar.</p>
-    <button id="btn-back-join" class="btn btn-ghost">Voltar</button>
-  </div>
-
-  <div class="error hidden" id="error-msg"></div>
 </div>
 
+<style>@keyframes fade{from{opacity:1}to{opacity:0}}</style>
 <script src="/socket.io/socket.io.js"></script>
-<script src="/js/menu.js"></script>
+<script src="/js/game.js"></script>
 </body>
 </html>

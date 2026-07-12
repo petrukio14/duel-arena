@@ -1,21 +1,39 @@
 ﻿const socket = io();
-
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-const keys = { up: false, down: false, left: false, right: false };
-let mouseX = 400, mouseY = 300, mouseDown = false;
+function $(id) { return document.getElementById(id); }
+function show(el) { el.classList.remove('hidden'); }
+function hide(el) { el.classList.add('hidden'); }
+function showScreen(id) {
+  document.querySelectorAll('#app > div').forEach((d) => d.classList.add('hidden'));
+  show($(id));
+}
+
 let myColor = null;
 let lastState = null;
 let inGame = false;
+let myRoomCode = null;
 
-function $(id) { return document.getElementById(id); }
-function show(el) { el.classList.remove('hidden'); }
-function hide(el) { el.classList.remove('hidden'); el.classList.add('hidden'); }
+const keys = { up: false, down: false, left: false, right: false };
+let mouseX = 400, mouseY = 300, mouseDown = false;
 
-$('btn-leave').addEventListener('click', () => {
-  socket.disconnect();
-  window.location.href = '/';
+function showError(msg) {
+  const e = $('error-msg');
+  e.textContent = msg; show(e);
+  setTimeout(() => hide(e), 5000);
+}
+
+$('btn-create').addEventListener('click', () => {
+  hide($('error-msg'));
+  socket.emit('create_room');
+});
+
+$('btn-join').addEventListener('click', () => {
+  hide($('error-msg'));
+  const code = $('room-code').value.toUpperCase().trim();
+  if (!code) { showError('Digite o codigo da sala'); return; }
+  socket.emit('join_room', code);
 });
 
 $('btn-ready').addEventListener('click', () => {
@@ -29,6 +47,10 @@ $('btn-rematch').addEventListener('click', () => {
   hide($('game-over'));
   $('status').textContent = 'Aguardando oponente ficar pronto...';
 });
+
+$('btn-back-menu').addEventListener('click', () => location.reload());
+$('btn-back-waiting').addEventListener('click', () => showScreen('screen-menu'));
+$('btn-leave').addEventListener('click', () => location.reload());
 
 window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
@@ -59,7 +81,9 @@ canvas.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = fals
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 function sendInput() {
-  const angle = Math.atan2(mouseY - (lastState?.me?.y || 300), mouseX - (lastState?.me?.x || 400));
+  const me = lastState?.players?.find((p) => p.color === myColor);
+  if (!me || !inGame) return;
+  const angle = Math.atan2(mouseY - me.y, mouseX - me.x);
   socket.emit('player_input', {
     move: { up: keys.up, down: keys.down, left: keys.left, right: keys.right },
     angle,
@@ -69,21 +93,48 @@ function sendInput() {
 
 setInterval(sendInput, 1000 / 30);
 
+socket.on('room_created', (code) => {
+  myRoomCode = code;
+  $('show-code').textContent = code;
+  $('waiting-title').textContent = 'Sala criada!';
+  $('waiting-desc').textContent = 'Compartilhe o codigo com seu oponente:';
+  $('waiting-status').textContent = 'Aguardando oponente...';
+  showScreen('screen-menu');
+  show($('panel-waiting'));
+});
+
+socket.on('room_joined', (code) => {
+  myRoomCode = code;
+  showScreen('screen-game');
+  $('status').textContent = 'Conectado. Aguardando oponente ficar pronto...';
+});
+
+socket.on('error_msg', (msg) => showError(msg));
+
+socket.on('both_connected', () => {
+  showScreen('screen-game');
+  $('status').textContent = 'Oponente conectado! Clique em "Estou Pronto" para começar.';
+  show($('btn-ready'));
+});
+
 socket.on('player_assign', (data) => {
   myColor = data.color;
-  $('status').textContent = 'Voce entrou na sala. Clique em "Estou Pronto" quando o oponente chegar.';
-  show($('btn-ready'));
+  if (!inGame) {
+    $('status').textContent = 'Voce entrou na sala. Aguardando oponente...';
+  }
 });
 
 socket.on('game_start', (data) => {
   inGame = true;
   hide($('btn-ready'));
-  $('status').textContent = 'Duelo!';
-  if (data?.arena) { canvas.width = data.arena.w; canvas.height = data.arena.h; }
+  $('status').textContent = 'Duelo! 3...';
+  setTimeout(() => { $('status').textContent = 'Duelo! 2...'; }, 500);
+  setTimeout(() => { $('status').textContent = 'Duelo! 1...'; }, 1000);
+  setTimeout(() => { $('status').textContent = 'LUTEM!'; }, 1500);
 });
 
 socket.on('state', (state) => {
-  state.players.forEach((p) => { if (p.color === myColor) { state.me = p; } });
+  if (!inGame) return;
   lastState = state;
   render(state);
 });
@@ -104,13 +155,12 @@ socket.on('game_over', (winner) => {
 });
 
 socket.on('opponent_left', () => {
-  if (!inGame) $('status').textContent = 'Oponente saiu. Voltando ao menu...';
-  setTimeout(() => window.location.href = '/', 1800);
+  if (inGame) $('status').textContent = 'Oponente saiu. Voltando ao menu...';
+  else $('status').textContent = 'Oponente desconectou. Voltando ao menu...';
+  inGame = false;
+  hide($('game-over'));
+  setTimeout(() => location.reload(), 2000);
 });
-
-const styleTag = document.createElement('style');
-styleTag.textContent = '@keyframes fade { from { opacity: 1; } to { opacity: 0; } }';
-document.head.appendChild(styleTag);
 
 function render(state) {
   ctx.fillStyle = '#0f1219';
@@ -163,14 +213,16 @@ function render(state) {
     ctx.fillRect(barX, barY, barW * hpPct, 5);
   }
 
-  if (lastState && lastState.me) {
-    const me = lastState.me;
-    const a = Math.atan2(mouseY - me.y, mouseX - me.x);
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(me.x, me.y);
-    ctx.lineTo(me.x + Math.cos(a) * 70, me.y + Math.sin(a) * 70);
-    ctx.stroke();
+  if (lastState?.players) {
+    const me = lastState.players.find((p) => p.color === myColor);
+    if (me) {
+      const a = Math.atan2(mouseY - me.y, mouseX - me.x);
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(me.x, me.y);
+      ctx.lineTo(me.x + Math.cos(a) * 70, me.y + Math.sin(a) * 70);
+      ctx.stroke();
+    }
   }
 }

@@ -54,9 +54,8 @@ class Matchmaker {
     room.addPlayer(socket);
     this.socketToRoom.set(socket.id, upperCode);
     socket.emit('room_joined', upperCode);
-    socket.to(upperCode).emit('opponent_joined', socket.id);
     if (room.players.length === 2) {
-      room.start();
+      room.bothConnected();
     }
     console.log(`[ROOM] ${socket.id} entrou na sala ${upperCode}`);
   }

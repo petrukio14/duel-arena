@@ -79,6 +79,10 @@ class GameRoom {
     });
   }
 
+  bothConnected() {
+    this.io.to(this.code).emit('both_connected');
+  }
+
   handleReady(id) {
     const p = this.players.find((p) => p.id === id);
     if (!p) return;
