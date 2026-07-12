@@ -27,6 +27,7 @@ $('btn-join').onclick = () => { socket.emit('join_room', $('input-code').value);
 $('btn-ready').onclick = () => { socket.emit('player_ready'); };
 $('btn-play-again').onclick = () => { $('game-info').textContent = 'Aguardando revanche...'; showScreen('screen-game'); socket.emit('play_again'); };
 $('btn-back-menu').onclick = () => showScreen('screen-menu');
+document.querySelectorAll('.btn-leave, #btn-leave').forEach((b) => b.onclick = () => location.reload());
 
 socket.on('room_created', (code) => { $('room-code').textContent = code; $('game-info').textContent = 'Aguardando oponente...'; });
 socket.on('room_joined', (code) => { $('room-code').textContent = code; $('game-info').textContent = 'Aguardando oponente...'; });
