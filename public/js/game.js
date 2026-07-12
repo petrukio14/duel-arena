@@ -122,3 +122,5 @@ function draw() {
 }
 
 draw();
+
+console.log('Snake Arena loaded');
