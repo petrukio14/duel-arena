@@ -19,7 +19,7 @@ const keys = { up: false, down: false, left: false, right: false };
 let mouseX = 400, mouseY = 300, mouseDown = false;
 
 let touchMove = { x: 0, y: 0, active: false };
-let touchShoot = { x: 400, y: 300, active: false };
+let touchShoot = { x: 400, y: 300, active: false, justFired: false };
 let touchShootBtn = false;
 let isMobile = window.matchMedia('(max-width: 820px), (pointer: coarse)').matches;
 
@@ -103,6 +103,7 @@ canvas.addEventListener('touchstart', (e) => {
       touchShoot.active = true;
       touchShoot.x = tx;
       touchShoot.y = ty;
+      touchShoot.justFired = true;
     }
   }
 }, { passive: false });
@@ -165,7 +166,10 @@ function sendInput() {
   if (touchShoot.active) {
     mx = touchShoot.x;
     my = touchShoot.y;
-    shooting = touchShootBtn || true;
+    if (touchShoot.justFired) {
+      shooting = true;
+      touchShoot.justFired = false;
+    }
   }
   if (touchShootBtn) {
     shooting = true;
