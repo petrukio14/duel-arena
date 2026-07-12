@@ -67,13 +67,6 @@ class Matchmaker {
     if (room) room.handleInput(socket.id, input);
   }
 
-  handleShoot(socket, angle) {
-    const code = this.socketToRoom.get(socket.id);
-    if (!code) return;
-    const room = this.rooms.get(code);
-    if (room) room.handleShoot(socket.id, angle);
-  }
-
   handleReady(socket) {
     const code = this.socketToRoom.get(socket.id);
     if (!code) return;

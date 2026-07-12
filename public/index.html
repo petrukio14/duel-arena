@@ -2,33 +2,24 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Duel Arena</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Snake Arena</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
 <div id="app">
   <div class="container" id="screen-menu">
-    <h1>Duel Arena</h1>
-    <p class="subtitle">Jogo de duelo 1v1 - cada um por si</p>
+    <h1>Snake Arena</h1>
+    <p class="subtitle">Jogo da Cobrinha 1v1 - quem cresce mais vence</p>
 
     <div class="panel" id="menu">
       <button id="btn-create" class="btn btn-primary">Criar Sala</button>
       <div class="separator">ou</div>
       <div class="join-row">
-        <input id="room-code" type="text" maxlength="4" placeholder="Codigo" autocomplete="off">
+        <input id="input-code" type="text" maxlength="4" placeholder="Codigo" autocomplete="off">
         <button id="btn-join" class="btn btn-secondary">Entrar</button>
       </div>
-    </div>
-
-    <div class="panel hidden" id="panel-waiting">
-      <h2 id="waiting-title">Sala criada!</h2>
-      <p id="waiting-desc">Compartilhe o codigo com seu oponente:</p>
-      <div class="room-code" id="show-code"></div>
-      <p class="waiting" id="waiting-status">Aguardando oponente...</p>
-      <p class="hint">Mande seu amigo abrir o link e digitar o codigo.</p>
-      <button id="btn-back-waiting" class="btn btn-ghost">Voltar</button>
     </div>
 
     <div class="error hidden" id="error-msg"></div>
@@ -36,22 +27,30 @@
 
   <div class="game-container hidden" id="screen-game">
     <div class="hud">
-      <div id="status">Conectando...</div>
+      <div id="game-info">Conectando...</div>
+      <div id="room-code-display">Sala: <span id="room-code">---</span></div>
       <button id="btn-ready" class="btn btn-primary hidden">Estou Pronto</button>
-      <button id="btn-leave" class="btn btn-ghost">Sair</button>
     </div>
 
-    <canvas id="canvas" width="800" height="600"></canvas>
+    <canvas id="game-canvas" width="800" height="600"></canvas>
 
-    <div id="game-over" class="game-over hidden">
-      <h2 id="result-text"></h2>
-      <button id="btn-rematch" class="btn btn-primary">Jogar Novamente</button>
-      <button id="btn-back-menu" class="btn btn-ghost">Voltar ao menu</button>
+    <div class="touch-controls">
+      <div class="dpad">
+        <button class="touch-dir" data-dir="up">&#9650;</button>
+        <button class="touch-dir" data-dir="left">&#9664;</button>
+        <button class="touch-dir" data-dir="down">&#9660;</button>
+        <button class="touch-dir" data-dir="right">&#9654;</button>
+      </div>
     </div>
+  </div>
+
+  <div class="container hidden" id="screen-result">
+    <h2 id="result-text"></h2>
+    <button id="btn-play-again" class="btn btn-primary">Jogar Novamente</button>
+    <button id="btn-back-menu" class="btn btn-ghost">Voltar ao menu</button>
   </div>
 </div>
 
-<style>@keyframes fade{from{opacity:1}to{opacity:0}}</style>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/game.js"></script>
 </body>

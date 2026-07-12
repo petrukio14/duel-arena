@@ -34,10 +34,6 @@ io.on('connection', (socket) => {
     matchmaker.handleInput(socket, input);
   });
 
-  socket.on('player_shoot', (angle) => {
-    matchmaker.handleShoot(socket, angle);
-  });
-
   socket.on('player_ready', () => {
     matchmaker.handleReady(socket);
   });
