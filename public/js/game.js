@@ -1,4 +1,4 @@
-﻿const socket = io();
+﻿const socket = io({ transports: ['polling', 'websocket'] });
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
@@ -11,17 +11,20 @@ function showScreen(id) {
 }
 
 let myColor = null;
-let lastState = null;
+let lastServerState = null;
 let inGame = false;
 let myRoomCode = null;
 
 const keys = { up: false, down: false, left: false, right: false };
 let mouseX = 400, mouseY = 300, mouseDown = false;
 
-let touchMove = { x: 0, y: 0, active: false };
+let touchMove = { x: 0, y: 0, active: false, id: -1 };
 let touchShoot = { x: 400, y: 300, active: false, justFired: false };
 let touchShootBtn = false;
 let isMobile = window.matchMedia('(max-width: 820px), (pointer: coarse)').matches;
+
+let prevInput = '';
+let selfPredicted = null;
 
 function showError(msg) {
   const e = $('error-msg');
@@ -80,9 +83,7 @@ canvas.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown = tr
 canvas.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-const joystick = { cx: 100, cy: 480, r: 60, kx: 0, ky: 0 };
-const shootBtn = { cx: 700, cy: 480, r: 50 };
-
+const jr = 60, sbr = 50;
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
@@ -92,17 +93,14 @@ canvas.addEventListener('touchstart', (e) => {
     const tx = (t.clientX - rect.left) * sx;
     const ty = (t.clientY - rect.top) * sy;
     const scale = canvas.width / 800;
-    const jx = 100 * scale, jy = 480 * scale, jr = 60 * scale;
-    const sbx = 700 * scale, sby = 480 * scale, sbr = 50 * scale;
-    if (Math.hypot(tx - jx, ty - jy) < jr * 1.4) {
-      touchMove.active = true;
-      touchMove.id = t.identifier;
-    } else if (Math.hypot(tx - sbx, ty - sby) < sbr * 1.4) {
+    const jx = 100 * scale, jy = 480 * scale, jrr = jr * scale;
+    const sbx = 700 * scale, sby = 480 * scale, sbrr = sbr * scale;
+    if (Math.hypot(tx - jx, ty - jy) < jrr * 1.4) {
+      touchMove.active = true; touchMove.id = t.identifier;
+    } else if (Math.hypot(tx - sbx, ty - sby) < sbrr * 1.4) {
       touchShootBtn = true;
     } else {
-      touchShoot.active = true;
-      touchShoot.x = tx;
-      touchShoot.y = ty;
+      touchShoot.active = true; touchShoot.x = tx; touchShoot.y = ty;
       touchShoot.justFired = true;
     }
   }
@@ -118,16 +116,12 @@ canvas.addEventListener('touchmove', (e) => {
     const ty = (t.clientY - rect.top) * sy;
     if (touchMove.active && t.identifier === touchMove.id) {
       const scale = canvas.width / 800;
-      const jx = 100 * scale, jy = 480 * scale, jr = 60 * scale;
-      const dx = tx - jx;
-      const dy = ty - jy;
+      const jx = 100 * scale, jy = 480 * scale, jrr = jr * scale;
+      const dx = tx - jx, dy = ty - jy;
       const d = Math.hypot(dx, dy);
       if (d > 0) {
-        const maxR = jr;
-        touchMove.x = d > maxR ? (dx / d) * maxR : dx;
-        touchMove.y = d > maxR ? (dy / d) * maxR : dy;
-      } else {
-        touchMove.x = 0; touchMove.y = 0;
+        touchMove.x = d > jrr ? (dx / d) * jrr : dx;
+        touchMove.y = d > jrr ? (dy / d) * jrr : dy;
       }
     }
   }
@@ -137,56 +131,144 @@ canvas.addEventListener('touchend', (e) => {
   e.preventDefault();
   for (const t of e.changedTouches) {
     if (touchMove.active && t.identifier === touchMove.id) {
-      touchMove.active = false;
-      touchMove.x = 0;
-      touchMove.y = 0;
+      touchMove.active = false; touchMove.x = 0; touchMove.y = 0;
     }
-    touchShootBtn = false;
-    touchShoot.active = false;
   }
+  touchShootBtn = false;
+  touchShoot.active = false;
 }, { passive: false });
-canvas.addEventListener('touchcancel', (e) => {
+
+canvas.addEventListener('touchcancel', () => {
   touchMove.active = false; touchMove.x = 0; touchMove.y = 0;
   touchShoot.active = false; touchShootBtn = false;
 });
 
-function sendInput() {
-  const me = lastState?.players?.find((p) => p.color === myColor);
-  if (!me || !inGame) return;
-
-  let mx = mouseX, my = mouseY, shooting = mouseDown, tu = false, td = false, tl = false, tr = false;
-
+function getInput() {
+  let mx = mouseX, my = mouseY, shooting = mouseDown, tu = keys.up, td = keys.down, tl = keys.left, tr = keys.right;
   if (touchMove.active) {
-    const deadzone = 10;
-    tu = touchMove.y < -deadzone;
-    td = touchMove.y > deadzone;
-    tl = touchMove.x < -deadzone;
-    tr = touchMove.x > deadzone;
+    const dz = 10;
+    tu = touchMove.y < -dz; td = touchMove.y > dz; tl = touchMove.x < -dz; tr = touchMove.x > dz;
   }
-  if (touchShoot.active) {
-    mx = touchShoot.x;
-    my = touchShoot.y;
-    if (touchShoot.justFired) {
-      shooting = true;
-      touchShoot.justFired = false;
-    }
-  }
-  if (touchShootBtn) {
-    shooting = true;
-  }
-
-  const move = {
-    up: keys.up || tu,
-    down: keys.down || td,
-    left: keys.left || tl,
-    right: keys.right || tr,
-  };
-
-  const angle = Math.atan2(my - me.y, mx - me.x);
-  socket.emit('player_input', { move, angle, shoot: shooting });
+  if (touchShoot.active) { mx = touchShoot.x; my = touchShoot.y; }
+  const move = { up: tu, down: td, left: tl, right: tr };
+  const key = `${tu}|${td}|${tl}|${tr}|${shooting}|${Math.round(mx)}|${Math.round(my)}`;
+  return { move, mx, my, shooting, key };
 }
 
-setInterval(sendInput, 1000 / 30);
+setInterval(() => {
+  if (!inGame) return;
+  const inp = getInput();
+  if (inp.key !== prevInput) {
+    prevInput = inp.key;
+    const me = lastServerState?.players?.find((p) => p.color === myColor);
+    if (me) {
+      const angle = Math.atan2(inp.my - me.y, inp.mx - me.x);
+      socket.emit('player_input', { move: inp.move, angle, shoot: inp.shooting });
+    }
+  }
+}, 1000 / 20);
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+let renderTime = 0;
+let prevState = null;
+let stateTime = 0;
+
+requestAnimationFrame(function loop(t) {
+  renderTime = t;
+  renderFrame();
+  requestAnimationFrame(loop);
+});
+
+function renderFrame() {
+  if (!lastServerState) {
+    ctx.fillStyle = '#0f1219';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
+  const state = lastServerState;
+  const me = state.players?.find((p) => p.color === myColor);
+  const opp = state.players?.find((p) => p.color !== myColor);
+
+  ctx.fillStyle = '#0f1219';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = '#1f2533';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= canvas.width; x += 50) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += 50) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+  ctx.strokeStyle = '#2a3144';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+
+  for (const proj of state.projectiles || []) {
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fef3c7';
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, proj.radius / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const p of state.players || []) {
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    const barW = 50, barX = p.x - barW / 2, barY = p.y - p.radius - 12;
+    ctx.fillStyle = '#1f2533';
+    ctx.fillRect(barX, barY, barW, 5);
+    const hpPct = Math.max(0, p.hp) / 100;
+    ctx.fillStyle = hpPct > 0.5 ? '#22c55e' : hpPct > 0.25 ? '#f59e0b' : '#ef4444';
+    ctx.fillRect(barX, barY, barW * hpPct, 5);
+  }
+
+  if (me) {
+    let ax = mouseX, ay = mouseY;
+    if (touchShoot.active) { ax = touchShoot.x; ay = touchShoot.y; }
+    const a = Math.atan2(ay - me.y, ax - me.x);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(me.x, me.y);
+    ctx.lineTo(me.x + Math.cos(a) * 70, me.y + Math.sin(a) * 70);
+    ctx.stroke();
+  }
+
+  if (isMobile && inGame) {
+    const s = canvas.width / 800;
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(100 * s, 480 * s, jr * s, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.arc(100 * s, 480 * s, 40 * s, 0, Math.PI * 2); ctx.stroke();
+    if (touchMove.active) {
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.beginPath(); ctx.arc(100 * s + touchMove.x, 480 * s + touchMove.y, 18 * s, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(239,68,68,0.2)';
+    ctx.beginPath(); ctx.arc(700 * s, 480 * s, sbr * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(239,68,68,0.6)';
+    ctx.font = `${Math.round(28 * s)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('ATIRAR', 700 * s, 480 * s);
+  }
+}
 
 socket.on('room_created', (code) => {
   myRoomCode = code;
@@ -214,24 +296,20 @@ socket.on('player_assign', (data) => {
     $('status').textContent = 'Voce entrou na sala. Aguardando oponente...';
   }
 });
-socket.on('game_start', (data) => {
+socket.on('game_start', () => {
   inGame = true;
   hide($('btn-ready'));
-  $('status').textContent = 'Duelo! 3...';
-  setTimeout(() => { $('status').textContent = 'Duelo! 2...'; }, 500);
-  setTimeout(() => { $('status').textContent = 'Duelo! 1...'; }, 1000);
-  setTimeout(() => { $('status').textContent = 'LUTEM!'; }, 1500);
+  $('status').textContent = 'LUTEM!';
 });
 socket.on('state', (state) => {
   if (!inGame) return;
-  lastState = state;
-  render(state);
+  lastServerState = state;
 });
 socket.on('hit', () => {
-  const flash = document.createElement('div');
-  flash.style.cssText = 'position:fixed;inset:0;background:rgba(239,68,68,0.25);pointer-events:none;z-index:5;animation:fade 0.2s linear forwards;';
-  document.body.appendChild(flash);
-  setTimeout(() => flash.remove(), 200);
+  const d = document.createElement('div');
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(239,68,68,0.25);pointer-events:none;z-index:5;animation:fade 0.2s forwards;';
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 200);
 });
 socket.on('game_over', (winner) => {
   inGame = false;
@@ -247,96 +325,3 @@ socket.on('opponent_left', () => {
   hide($('game-over'));
   setTimeout(() => location.reload(), 2000);
 });
-
-function render(state) {
-  ctx.fillStyle = '#0f1219';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.strokeStyle = '#1f2533';
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= canvas.width; x += 50) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-  }
-  for (let y = 0; y <= canvas.height; y += 50) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-  }
-
-  ctx.strokeStyle = '#2a3144';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-
-  for (const proj of state.projectiles || []) {
-    ctx.fillStyle = '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#fef3c7';
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y, proj.radius / 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  for (const p of state.players || []) {
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = 15;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    const barW = 50;
-    const barX = p.x - barW / 2;
-    const barY = p.y - p.radius - 12;
-    ctx.fillStyle = '#1f2533';
-    ctx.fillRect(barX, barY, barW, 5);
-    const hpPct = Math.max(0, p.hp) / 100;
-    ctx.fillStyle = hpPct > 0.5 ? '#22c55e' : hpPct > 0.25 ? '#f59e0b' : '#ef4444';
-    ctx.fillRect(barX, barY, barW * hpPct, 5);
-  }
-
-  if (lastState?.players) {
-    const me = lastState.players.find((p) => p.color === myColor);
-    if (me) {
-      let ax = mouseX, ay = mouseY;
-      if (touchShoot.active) { ax = touchShoot.x; ay = touchShoot.y; }
-      const a = Math.atan2(ay - me.y, ax - me.x);
-      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(me.x, me.y);
-      ctx.lineTo(me.x + Math.cos(a) * 70, me.y + Math.sin(a) * 70);
-      ctx.stroke();
-    }
-  }
-
-  if (isMobile && inGame) {
-    const s = canvas.width / 800;
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(100 * s, 480 * s, 60 * s, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.beginPath();
-    ctx.arc(100 * s, 480 * s, 40 * s, 0, Math.PI * 2);
-    ctx.stroke();
-    if (touchMove.active) {
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.beginPath();
-      ctx.arc(100 * s + touchMove.x, 480 * s + touchMove.y, 18 * s, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = 'rgba(239,68,68,0.2)';
-    ctx.beginPath();
-    ctx.arc(700 * s, 480 * s, 50 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(239,68,68,0.6)';
-    ctx.font = `${Math.round(28 * s)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('ATIRAR', 700 * s, 480 * s);
-  }
-}

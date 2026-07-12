@@ -4,15 +4,15 @@
  * - Atualiza 60 vezes/seg
  * - Dispara estado pros 2 clientes via socket.io
  */
-const TICK_RATE = 60;
+const TICK_RATE = 20;
 const ARENA_W = 800;
 const ARENA_H = 600;
 const PLAYER_RADIUS = 18;
-const PLAYER_SPEED = 3.5;
-const PROJECTILE_SPEED = 7;
+const PLAYER_SPEED = 3;
+const PROJECTILE_SPEED = 6;
 const PROJECTILE_RADIUS = 6;
 const PROJECTILE_DAMAGE = 10;
-const SHOOT_COOLDOWN = 350;
+const SHOOT_COOLDOWN = 400;
 const MAX_HP = 100;
 
 class GameRoom {
@@ -24,7 +24,7 @@ class GameRoom {
     this.lastUpdate = 0;
     this.tickInterval = null;
     this.running = false;
-    this.winners = {};
+    this.seq = 0;
   }
 
   addPlayer(socket) {
@@ -75,7 +75,7 @@ class GameRoom {
       vx: Math.cos(angle) * PROJECTILE_SPEED,
       vy: Math.sin(angle) * PROJECTILE_SPEED,
       radius: PROJECTILE_RADIUS,
-      life: 120,
+      life: 80,
     });
   }
 
@@ -171,16 +171,19 @@ class GameRoom {
       return;
     }
 
+    this.seq++;
     const state = {
+      seq: this.seq,
+      t: Date.now(),
       players: this.players.map((p) => ({
         id: p.id,
-        x: p.x,
-        y: p.y,
+        x: Math.round(p.x),
+        y: Math.round(p.y),
         hp: p.hp,
         color: p.color,
         radius: p.radius,
       })),
-      projectiles: this.projectiles.map((p) => ({ id: p.id, x: p.x, y: p.y, radius: p.radius })),
+      projectiles: this.projectiles.map((p) => ({ id: p.id, x: Math.round(p.x), y: Math.round(p.y), radius: p.radius })),
     };
     this.io.to(this.code).emit('state', state);
   }
